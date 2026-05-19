@@ -42,6 +42,12 @@ export async function GET(request) {
     const checkpoint = request.cookies.get('k_checkpoint')?.value
 
     if (checkpoint === '2') {
+      const step2ok = request.cookies.get('k_s2')?.value === '1'
+      if (!step2ok) {
+        const res = NextResponse.json({ success: false, redirect: '/key?error=bypass' })
+        return res
+      }
+
       const tempToken = generateToken()
       const supabase = getSupabase()
       if (supabase) {
@@ -56,6 +62,7 @@ export async function GET(request) {
       const res = NextResponse.json({ success: true, token: tempToken })
       res.cookies.set('k_checkpoint', '3', { httpOnly: false, maxAge: 1800, path: '/' })
       res.cookies.set('k_token', tempToken, { httpOnly: false, maxAge: 20, path: '/' })
+      res.cookies.delete('k_s2')
       return res
     }
 
@@ -70,6 +77,7 @@ export async function GET(request) {
 
     const res = NextResponse.json({ success: true, needSecond: true })
     res.cookies.set('k_checkpoint', '2', { httpOnly: false, maxAge: 1800, path: '/' })
+    res.cookies.set('k_s2', '1', { httpOnly: true, maxAge: 1800, path: '/' })
     return res
   } catch (e) {
     return NextResponse.json({ success: false, redirect: '/key?error=api_error&msg=' + encodeURIComponent(e.message) })

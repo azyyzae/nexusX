@@ -27,7 +27,17 @@ export async function POST(request) {
         session_id: sessionId,
         expires_at: expiresAt
       })
+    } catch (e) {
+      try {
+        await supabase.from('keys').insert({
+          key_value: key,
+          status: 'active',
+          session_id: sessionId
+        })
+      } catch (e2) {}
+    }
 
+    try {
       await supabase.from('sessions').update({
         checkpoint: 3,
         temp_token: null,
