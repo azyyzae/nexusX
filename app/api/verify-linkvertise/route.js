@@ -11,19 +11,9 @@ export async function GET(request) {
   }
 
   const sessionId = request.cookies.get('k_session')?.value
-  const startTime = request.cookies.get('k_start')?.value
 
-  if (!sessionId || !startTime) {
+  if (!sessionId) {
     return NextResponse.json({ success: false, redirect: '/key?error=invalid_session' })
-  }
-
-  const startMs = Number(startTime)
-  if (isNaN(startMs) || Date.now() - startMs < 15000) {
-    const supabase = getSupabase()
-    await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
-    const res = NextResponse.json({ success: false, redirect: '/key?error=too_fast' })
-    res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
-    return res
   }
 
   const token = process.env.LINKVERTISE_ANTIBY_TOKEN
@@ -54,8 +44,7 @@ export async function GET(request) {
 
     const res = NextResponse.json({ success: true, token: tempToken })
     res.cookies.set('k_checkpoint', '2', { httpOnly: false, maxAge: 1800, path: '/' })
-    res.cookies.set('k_token', tempToken, { httpOnly: true, maxAge: 20, path: '/' })
-    res.cookies.delete('k_start')
+    res.cookies.set('k_token', tempToken, { httpOnly: false, maxAge: 20, path: '/' })
     return res
   } catch {
     return NextResponse.json({ success: false, redirect: '/key?error=api_error' })

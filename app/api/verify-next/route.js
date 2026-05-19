@@ -6,7 +6,6 @@ export async function POST(request) {
   const { token } = await request.json()
   const sessionId = request.cookies.get('k_session')?.value
   const bypassFlag = request.cookies.get('k_bypass')?.value
-  const storedToken = request.cookies.get('k_token')?.value
 
   if (!sessionId || !token) {
     return NextResponse.json({ success: false, redirect: '/key?error=invalid_session' })
@@ -14,10 +13,6 @@ export async function POST(request) {
 
   if (bypassFlag === 'true') {
     return NextResponse.json({ success: false, redirect: '/key?error=bypass' })
-  }
-
-  if (token !== storedToken) {
-    return NextResponse.json({ success: false, redirect: '/key?error=invalid_token' })
   }
 
   const supabase = getSupabase()
@@ -51,7 +46,6 @@ export async function POST(request) {
 
   response.cookies.set('k_key', key, { httpOnly: false, maxAge: 1800, path: '/' })
   response.cookies.set('k_checkpoint', '3', { httpOnly: false, maxAge: 1800, path: '/' })
-  response.cookies.set('k_token', '', { httpOnly: true, maxAge: 0, path: '/' })
 
   return response
 }

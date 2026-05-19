@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import AntiDebug from './anti-debug'
 
 function getCookie(name) {
@@ -26,8 +26,7 @@ function StepDots({ current }) {
               background: current >= n ? active : 'transparent',
               border: `2px solid ${current >= n ? active : dim}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.7em', color: current >= n ? '#fff' : dim,
-              transition: '0.2s'
+              fontSize: '0.7em', color: current >= n ? '#fff' : dim
             }}>{n}</div>
             <span style={{ fontSize: '0.6em', color: current === n ? fg : dim }}>{labels[i]}</span>
           </div>
@@ -42,39 +41,20 @@ export default function KeyPage() {
   const [key, setKey] = useState(null)
   const [error, setError] = useState(null)
 
-  const handleHash = useCallback(async (hash) => {
-    setStep(2)
-    try {
-      const res = await fetch(`/api/verify-linkvertise?hash=${hash}`)
-      const data = await res.json()
-      if (!data.success) {
-        window.location.href = data.redirect || '/key?error=bypass'
-        return
-      }
-      const nextRes = await fetch('/api/verify-next', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: data.token })
-      })
-      const nextData = await nextRes.json()
-      if (nextData.success) {
-        setKey(getCookie('k_key'))
-        setStep(3)
-      } else {
-        window.location.href = nextData.redirect || '/key?error=bypass'
-      }
-    } catch {
-      window.location.href = '/key?error=error'
-    }
-  }, [])
-
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const hash = params.get('hash')
+    const token = params.get('token')
     const errorParam = params.get('error')
 
     if (getCookie('k_bypass') === 'true' || errorParam === 'bypass') {
       setError('bypass')
+      return
+    }
+
+    if (errorParam) {
+      window.history.replaceState({}, '', '/key')
+      setError(errorParam)
       return
     }
 
@@ -87,27 +67,57 @@ export default function KeyPage() {
 
     if (hash) {
       window.history.replaceState({}, '', '/key')
-      handleHash(hash)
+      setStep(2)
+      fetch(`/api/verify-linkvertise?hash=${hash}`)
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) {
+            window.location.href = data.redirect || '/key?error=bypass'
+            return
+          }
+          fetch('/api/verify-next', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: data.token })
+          })
+            .then(r => r.json())
+            .then(nextData => {
+              if (nextData.success) {
+                setKey(getCookie('k_key'))
+                setStep(3)
+              } else {
+                window.location.href = nextData.redirect || '/key?error=bypass'
+              }
+            })
+            .catch(() => { window.location.href = '/key?error=error' })
+        })
+        .catch(() => { window.location.href = '/key?error=error' })
       return
     }
 
-    if (getCookie('k_checkpoint') === '3') {
-      setKey(getCookie('k_key'))
-      setStep(3)
+    if (token) {
+      window.history.replaceState({}, '', '/key')
+      setStep(2)
+      fetch('/api/verify-next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            setKey(getCookie('k_key'))
+            setStep(3)
+          } else {
+            window.location.href = data.redirect || '/key?error=bypass'
+          }
+        })
+        .catch(() => { window.location.href = '/key?error=error' })
       return
     }
 
-    if (getCookie('k_checkpoint') === '2') {
-      fetch('/api/start-session', { method: 'POST' })
-        .then(() => setStep(1))
-        .catch(() => setError('session'))
-      return
-    }
-
-    fetch('/api/start-session', { method: 'POST' })
-      .then(() => setStep(1))
-      .catch(() => setError('session'))
-  }, [handleHash])
+    setStep(1)
+  }, [])
 
   if (error) {
     return (
@@ -144,21 +154,12 @@ export default function KeyPage() {
     )
   }
 
-  if (step === null) {
-    return (
-      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, fontFamily: 'monospace' }}>
-        <div style={{ width: '24px', height: '24px', border: '2px solid ' + dim, borderTop: '2px solid ' + fg, borderRadius: '50%', animation: 's 1s linear infinite' }} />
-        <style>{'@keyframes s { to { transform: rotate(360deg) } }'}</style>
-      </main>
-    )
-  }
-
   return (
     <main style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, position: 'relative', fontFamily: 'monospace' }}>
       <AntiDebug />
       <StepDots current={1} />
       <button
-        onClick={() => window.location.href = 'https://linkvertise.com/3037608/GIQY2zNR931p'}
+        onClick={() => window.location.href = '/api/start-linkvertise'}
         style={{
           padding: '12px 40px',
           background: dim,
