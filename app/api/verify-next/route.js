@@ -21,28 +21,17 @@ export async function POST(request) {
   const supabase = getSupabase()
   if (supabase) {
     try {
-      await supabase.from('keys').insert({
+      const { error } = await supabase.from('keys').insert({
         key_value: key,
         status: 'active',
-        session_id: sessionId,
         expires_at: expiresAt
       })
-    } catch (e) {
-      try {
+      if (error) {
         await supabase.from('keys').insert({
           key_value: key,
-          status: 'active',
-          session_id: sessionId
+          status: 'active'
         })
-      } catch (e2) {}
-    }
-
-    try {
-      await supabase.from('sessions').update({
-        checkpoint: 3,
-        temp_token: null,
-        temp_token_expiry: null
-      }).eq('session_id', sessionId)
+      }
     } catch (e) {}
   }
 
