@@ -122,7 +122,7 @@ export default function KeyPage() {
   if (error) {
     return (
       <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, color: fg, fontFamily: 'monospace' }}>
-        <pre style={{ color: '#b06060' }}>{error === 'bypass' ? 'blocked' : 'error'}</pre>
+        <pre style={{ color: '#b06060' }}>{error}</pre>
       </main>
     )
   }
