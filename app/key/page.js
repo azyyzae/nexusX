@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import AntiDebug from './anti-debug'
 
 function getCookie(name) {
@@ -8,30 +8,19 @@ function getCookie(name) {
   return match ? match[2] : null
 }
 
-const bg = '#0e1420'
-const fg = '#6080b0'
-const dim = '#1a2a40'
-const active = '#3a7bc8'
-
-function StepDots({ current }) {
-  const labels = ['linkvertise', 'verify', 'complete']
+function StepDot({ n, label, current, done }) {
   return (
-    <div style={{ position: 'absolute', top: '30px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '0', alignItems: 'center' }}>
-      {[1, 2, 3].map((n, i) => (
-        <div key={n} style={{ display: 'flex', alignItems: 'center' }}>
-          {i > 0 && <div style={{ width: '40px', height: '1px', background: current >= n ? active : dim }} />}
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-            <div style={{
-              width: '24px', height: '24px', borderRadius: '50%',
-              background: current >= n ? active : 'transparent',
-              border: `2px solid ${current >= n ? active : dim}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '0.7em', color: current >= n ? '#fff' : dim
-            }}>{n}</div>
-            <span style={{ fontSize: '0.6em', color: current === n ? fg : dim }}>{labels[i]}</span>
-          </div>
-        </div>
-      ))}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+      <div style={{
+        width: '32px', height: '32px', borderRadius: '50%',
+        background: done ? '#3a7bc8' : current ? '#1a2a4a' : 'transparent',
+        border: `2px solid ${done ? '#3a7bc8' : current ? '#6080b0' : '#1a2a40'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: '0.8em', fontWeight: 600,
+        color: done ? '#fff' : current ? '#8ab8f0' : '#3a4a5a',
+        transition: '0.3s'
+      }}>{done ? '✓' : n}</div>
+      <span style={{ fontSize: '0.7em', color: current ? '#6080b0' : '#3a4a5a' }}>{label}</span>
     </div>
   )
 }
@@ -40,11 +29,42 @@ export default function KeyPage() {
   const [step, setStep] = useState(null)
   const [key, setKey] = useState(null)
   const [error, setError] = useState(null)
+  const [secondRound, setSecondRound] = useState(false)
+  const [timeLeft, setTimeLeft] = useState('')
+
+  const handleHash = useCallback(async (hash) => {
+    setStep(2)
+    try {
+      const res = await fetch(`/api/verify-linkvertise?hash=${hash}`)
+      const data = await res.json()
+      if (!data.success) {
+        window.location.href = data.redirect || '/key?error=bypass'
+        return
+      }
+      if (data.needSecond) {
+        setStep(1)
+        return
+      }
+      const nextRes = await fetch('/api/verify-next', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: data.token })
+      })
+      const nextData = await nextRes.json()
+      if (nextData.success) {
+        setKey(getCookie('k_key'))
+        setStep(3)
+      } else {
+        window.location.href = nextData.redirect || '/key?error=bypass'
+      }
+    } catch {
+      window.location.href = '/key?error=error'
+    }
+  }, [])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const hash = params.get('hash')
-    const token = params.get('token')
     const errorParam = params.get('error')
 
     if (getCookie('k_bypass') === 'true' || errorParam === 'bypass') {
@@ -55,129 +75,128 @@ export default function KeyPage() {
     }
 
     if (errorParam) {
-      const msg = params.get('msg')
       window.history.replaceState({}, '', '/key')
-      setError(msg || errorParam)
+      setError(errorParam)
       return
     }
 
-    const keyVal = getCookie('k_key')
-    if (keyVal) {
-      setKey(keyVal)
+    if (getCookie('k_key')) {
+      setKey(getCookie('k_key'))
       setStep(3)
+      const expires = getCookie('k_expires')
+      if (expires) {
+        const update = () => {
+          const diff = new Date(expires).getTime() - Date.now()
+          if (diff <= 0) { setTimeLeft('expired'); return }
+          const h = Math.floor(diff / 3600000)
+          const m = Math.floor((diff % 3600000) / 60000)
+          const s = Math.floor((diff % 60000) / 1000)
+          setTimeLeft(`${h}h ${m}m ${s}s`)
+        }
+        update()
+        const iv = setInterval(update, 1000)
+        return () => clearInterval(iv)
+      }
       return
     }
 
     if (hash) {
       window.history.replaceState({}, '', '/key')
-      setStep(2)
-      fetch(`/api/verify-linkvertise?hash=${hash}`)
-        .then(r => r.json())
-        .then(data => {
-          if (!data.success) {
-            window.location.href = data.redirect || '/key?error=bypass'
-            return
-          }
-          fetch('/api/verify-next', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: data.token })
-          })
-            .then(r => r.json())
-            .then(nextData => {
-              if (nextData.success) {
-                setKey(getCookie('k_key'))
-                setStep(3)
-              } else {
-                window.location.href = nextData.redirect || '/key?error=bypass'
-              }
-            })
-            .catch(() => { window.location.href = '/key?error=error' })
-        })
-        .catch(() => { window.location.href = '/key?error=error' })
+      handleHash(hash)
       return
     }
 
-    if (token) {
-      window.history.replaceState({}, '', '/key')
-      setStep(2)
-      fetch('/api/verify-next', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token })
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.success) {
-            setKey(getCookie('k_key'))
-            setStep(3)
-          } else {
-            window.location.href = data.redirect || '/key?error=bypass'
-          }
-        })
-        .catch(() => { window.location.href = '/key?error=error' })
+    const cp = getCookie('k_checkpoint')
+    if (cp === '2') {
+      setSecondRound(true)
+      setStep(1)
       return
     }
 
     setStep(1)
-  }, [])
+  }, [handleHash])
+
+  const bg = 'linear-gradient(135deg, #0a0e18 0%, #0f1a2e 50%, #0a0e18 100%)'
+  const cardBg = 'rgba(20, 30, 50, 0.6)'
+  const border = '1px solid rgba(60, 80, 120, 0.3)'
 
   if (error) {
     return (
-      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, color: fg, fontFamily: 'monospace' }}>
-        <pre style={{ color: '#b06060' }}>{error}</pre>
+      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, fontFamily: 'monospace' }}>
+        <div style={{ padding: '24px 32px', background: cardBg, border, borderRadius: '8px', color: '#b06060', fontSize: '0.9em' }}>{error}</div>
       </main>
     )
   }
 
   if (step === 3 && key) {
     return (
-      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, position: 'relative', fontFamily: 'monospace' }}>
-        <AntiDebug />
-        <StepDots current={3} />
+      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, fontFamily: 'monospace', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '30px', display: 'flex', gap: '60px', alignItems: 'center' }}>
+          <StepDot n={1} label="1/2 link" current={false} done={true} />
+          <StepDot n={2} label="2/2 link" current={false} done={true} />
+          <StepDot n={3} label="complete" current={true} done={false} />
+        </div>
         <div style={{
-          padding: '28px 40px',
-          border: '1px solid ' + active,
-          color: '#8ab8f0',
-          fontSize: '1.1em',
-          letterSpacing: '1px'
-        }}>{key}</div>
+          background: cardBg, border, borderRadius: '12px',
+          padding: '36px 48px', backdropFilter: 'blur(12px)',
+          textAlign: 'center'
+        }}>
+          <div style={{ color: '#3a4a5a', fontSize: '0.75em', marginBottom: '12px', letterSpacing: '2px' }}>YOUR KEY</div>
+          <div style={{ color: '#8ab8f0', fontSize: '1.15em', letterSpacing: '1px', fontFamily: 'monospace' }}>{key}</div>
+          <div style={{ color: timeLeft === 'expired' ? '#b06060' : '#3a4a5a', fontSize: '0.7em', marginTop: '16px' }}>{timeLeft || '12h 0m 0s'}</div>
+        </div>
       </main>
     )
   }
 
   if (step === 2) {
     return (
-      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, position: 'relative', fontFamily: 'monospace' }}>
-        <AntiDebug />
-        <StepDots current={2} />
-        <div style={{ width: '24px', height: '24px', border: '2px solid ' + dim, borderTop: '2px solid ' + fg, borderRadius: '50%', animation: 's 1s linear infinite' }} />
+      <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, fontFamily: 'monospace', position: 'relative' }}>
+        <div style={{ position: 'absolute', top: '30px', display: 'flex', gap: '60px', alignItems: 'center' }}>
+          <StepDot n={1} label="1/2 link" current={false} done={true} />
+          <StepDot n={2} label="2/2 link" current={true} done={false} />
+          <StepDot n={3} label="complete" current={false} done={false} />
+        </div>
+        <div style={{ width: '28px', height: '28px', border: '2px solid #1a2a40', borderTop: '2px solid #6080b0', borderRadius: '50%', animation: 's 1s linear infinite' }} />
         <style>{'@keyframes s { to { transform: rotate(360deg) } }'}</style>
       </main>
     )
   }
 
   return (
-    <main style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, position: 'relative', fontFamily: 'monospace' }}>
-      <AntiDebug />
-      <StepDots current={1} />
-      <button
-        onClick={() => window.location.href = '/api/start-linkvertise'}
-        style={{
-          padding: '12px 40px',
-          background: dim,
-          color: fg,
-          border: '1px solid ' + fg,
-          cursor: 'pointer',
-          fontFamily: 'monospace',
-          fontSize: '0.9em',
-          transition: '0.15s'
-        }}
-        onMouseEnter={e => { e.target.style.background = active; e.target.style.color = '#fff' }}
-        onMouseLeave={e => { e.target.style.background = dim; e.target.style.color = fg }}
-      >
-        continue
-      </button>
+    <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: bg, fontFamily: 'monospace', position: 'relative' }}>
+      <div style={{ position: 'absolute', top: '30px', display: 'flex', gap: '60px', alignItems: 'center' }}>
+        <StepDot n={1} label="1/2 link" current={!secondRound} done={secondRound} />
+        <StepDot n={2} label="2/2 link" current={secondRound} done={false} />
+        <StepDot n={3} label="complete" current={false} done={false} />
+      </div>
+      <div style={{
+        background: cardBg, border, borderRadius: '12px',
+        padding: '40px 56px', backdropFilter: 'blur(12px)',
+        textAlign: 'center'
+      }}>
+        <div style={{ color: '#3a4a5a', fontSize: '0.75em', marginBottom: '8px', letterSpacing: '2px' }}>
+          {secondRound ? 'STEP 2 OF 2' : 'STEP 1 OF 2'}
+        </div>
+        <div style={{ color: '#5a7a9a', fontSize: '0.85em', marginBottom: '24px' }}>
+          {secondRound ? 'complete one more verification' : 'complete the verification'}
+        </div>
+        <button
+          onClick={() => window.location.href = '/api/start-linkvertise'}
+          style={{
+            padding: '12px 48px', borderRadius: '6px',
+            background: 'linear-gradient(135deg, #1a2a4a 0%, #2a4a7a 100%)',
+            color: '#8ab8f0', border: '1px solid rgba(60, 100, 160, 0.4)',
+            cursor: 'pointer', fontFamily: 'monospace',
+            fontSize: '0.85em', letterSpacing: '1px',
+            transition: '0.2s'
+          }}
+          onMouseEnter={e => { e.target.style.background = 'linear-gradient(135deg, #2a4a7a 0%, #3a6a9a 100%)'; e.target.style.borderColor = '#4a8fe0' }}
+          onMouseLeave={e => { e.target.style.background = 'linear-gradient(135deg, #1a2a4a 0%, #2a4a7a 100%)'; e.target.style.borderColor = 'rgba(60, 100, 160, 0.4)' }}
+        >
+          continue
+        </button>
+      </div>
     </main>
   )
 }

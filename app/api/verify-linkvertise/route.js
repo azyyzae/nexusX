@@ -38,25 +38,40 @@ export async function GET(request) {
       res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
       return res
     }
+
+    const checkpoint = request.cookies.get('k_checkpoint')?.value
+
+    if (checkpoint === '2') {
+      const tempToken = generateToken()
+      const supabase = getSupabase()
+      if (supabase) {
+        try {
+          await supabase.from('sessions').update({
+            checkpoint: 3,
+            temp_token: tempToken,
+            temp_token_expiry: new Date(Date.now() + 20000).toISOString()
+          }).eq('session_id', sessionId)
+        } catch (e) {}
+      }
+      const res = NextResponse.json({ success: true, token: tempToken })
+      res.cookies.set('k_checkpoint', '3', { httpOnly: false, maxAge: 1800, path: '/' })
+      res.cookies.set('k_token', tempToken, { httpOnly: false, maxAge: 20, path: '/' })
+      return res
+    }
+
+    const supabase = getSupabase()
+    if (supabase) {
+      try {
+        await supabase.from('sessions').update({
+          checkpoint: 2
+        }).eq('session_id', sessionId)
+      } catch (e) {}
+    }
+
+    const res = NextResponse.json({ success: true, needSecond: true })
+    res.cookies.set('k_checkpoint', '2', { httpOnly: false, maxAge: 1800, path: '/' })
+    return res
   } catch (e) {
     return NextResponse.json({ success: false, redirect: '/key?error=api_error&msg=' + encodeURIComponent(e.message) })
   }
-
-  const tempToken = generateToken()
-
-  const supabase = getSupabase()
-  if (supabase) {
-    try {
-      await supabase.from('sessions').update({
-        checkpoint: 2,
-        temp_token: tempToken,
-        temp_token_expiry: new Date(Date.now() + 20000).toISOString()
-      }).eq('session_id', sessionId)
-    } catch (e) {}
-  }
-
-  const res = NextResponse.json({ success: true, token: tempToken })
-  res.cookies.set('k_checkpoint', '2', { httpOnly: false, maxAge: 1800, path: '/' })
-  res.cookies.set('k_token', tempToken, { httpOnly: false, maxAge: 20, path: '/' })
-  return res
 }

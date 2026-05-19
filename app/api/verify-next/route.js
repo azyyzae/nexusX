@@ -16,6 +16,7 @@ export async function POST(request) {
   }
 
   const key = generateKey()
+  const expiresAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
 
   const supabase = getSupabase()
   if (supabase) {
@@ -23,7 +24,8 @@ export async function POST(request) {
       await supabase.from('keys').insert({
         key_value: key,
         status: 'active',
-        session_id: sessionId
+        session_id: sessionId,
+        expires_at: expiresAt
       })
 
       await supabase.from('sessions').update({
@@ -36,8 +38,9 @@ export async function POST(request) {
 
   const response = NextResponse.json({ success: true, redirect: '/key' })
 
-  response.cookies.set('k_key', key, { httpOnly: false, maxAge: 1800, path: '/' })
-  response.cookies.set('k_checkpoint', '3', { httpOnly: false, maxAge: 1800, path: '/' })
+  response.cookies.set('k_key', key, { httpOnly: false, maxAge: 43200, path: '/' })
+  response.cookies.set('k_checkpoint', '3', { httpOnly: false, maxAge: 43200, path: '/' })
+  response.cookies.set('k_expires', expiresAt, { httpOnly: false, maxAge: 43200, path: '/' })
 
   return response
 }

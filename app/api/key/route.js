@@ -17,12 +17,17 @@ export async function GET(request) {
 
   const { data } = await supabase
     .from('keys')
-    .select('status')
+    .select('status, expires_at')
     .eq('key_value', key)
     .single()
 
   if (!data) {
     return NextResponse.json({ status: getStatusWord('not_found') })
+  }
+
+  if (data.expires_at && new Date(data.expires_at) < new Date()) {
+    await supabase.from('keys').update({ status: 'expired' }).eq('key_value', key)
+    return NextResponse.json({ status: getStatusWord('expired') })
   }
 
   return NextResponse.json({ status: getStatusWord(data.status) })
