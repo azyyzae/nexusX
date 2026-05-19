@@ -53,8 +53,9 @@ export default function KeyPage() {
     }
 
     if (errorParam) {
+      const msg = params.get('msg')
       window.history.replaceState({}, '', '/key')
-      setError(errorParam)
+      setError(msg || errorParam)
       return
     }
 

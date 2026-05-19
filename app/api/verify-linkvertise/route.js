@@ -20,7 +20,17 @@ export async function GET(request) {
   const apiUrl = `https://publisher.linkvertise.com/api/v1/anti_bypassing?token=${token}&hash=${hash}`
 
   try {
-    const apiRes = await fetch(apiUrl, { method: 'POST' })
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000)
+    const apiRes = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': '*/*'
+      },
+      signal: controller.signal
+    })
+    clearTimeout(timeout)
     const result = await apiRes.text()
 
     if (result !== 'TRUE') {
@@ -46,7 +56,7 @@ export async function GET(request) {
     res.cookies.set('k_checkpoint', '2', { httpOnly: false, maxAge: 1800, path: '/' })
     res.cookies.set('k_token', tempToken, { httpOnly: false, maxAge: 20, path: '/' })
     return res
-  } catch {
-    return NextResponse.json({ success: false, redirect: '/key?error=api_error' })
+  } catch (e) {
+    return NextResponse.json({ success: false, redirect: '/key?error=api_error&msg=' + encodeURIComponent(e.message) })
   }
 }
