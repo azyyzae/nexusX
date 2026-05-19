@@ -16,9 +16,8 @@ export default function KeyPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const errorParam = params.get('error')
-    const bypassCookie = getCookie('k_bypass')
 
-    if (bypassCookie === 'true' || errorParam === 'bypass') {
+    if (getCookie('k_bypass') === 'true' || errorParam === 'bypass') {
       setError('bypass')
       setLoading(false)
       return
@@ -37,16 +36,10 @@ export default function KeyPage() {
       return
     }
 
-    const session = getCookie('k_session')
-    if (session) {
-      setLoading(false)
-      return
-    }
-
     fetch('/api/start-session', { method: 'POST' })
       .then(() => setLoading(false))
       .catch(() => {
-        setError('error')
+        setError('session')
         setLoading(false)
       })
   }, [])
@@ -55,16 +48,15 @@ export default function KeyPage() {
     return (
       <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0e1420', color: '#6080b0', fontFamily: 'monospace' }}>
         <div style={{ width: '24px', height: '24px', border: '2px solid #1a2a40', borderTop: '2px solid #6080b0', borderRadius: '50%', animation: 's 1s linear infinite' }} />
-        <style>{`@keyframes s { to { transform: rotate(360deg) } }`}</style>
+        <style>{'@keyframes s { to { transform: rotate(360deg) } }'}</style>
       </main>
     )
   }
 
-  if (error) {
+  if (error === 'bypass') {
     return (
       <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#0e1420', color: '#6080b0', fontFamily: 'monospace' }}>
-        <AntiDebug />
-        <pre style={{ color: '#b06060' }}>something broke</pre>
+        <pre style={{ color: '#b06060' }}>blocked</pre>
       </main>
     )
   }

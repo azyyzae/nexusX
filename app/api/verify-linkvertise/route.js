@@ -25,6 +25,7 @@ export async function GET(request) {
     await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
     const res = NextResponse.redirect(new URL('/key?error=too_fast', request.url))
     res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
+    res.cookies.delete('k_start')
     return res
   }
 
@@ -40,18 +41,20 @@ export async function GET(request) {
       await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
       const res = NextResponse.redirect(new URL('/key?error=bypass', request.url))
       res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
+      res.cookies.delete('k_start')
       return res
     }
 
-    const supabase = getSupabase()
     const tempToken = generateToken()
-    const expiry = new Date(Date.now() + 20000).toISOString()
 
-    await supabase.from('sessions').update({
-      checkpoint: 2,
-      temp_token: tempToken,
-      temp_token_expiry: expiry
-    }).eq('session_id', sessionId)
+    try {
+      const supabase = getSupabase()
+      await supabase.from('sessions').update({
+        checkpoint: 2,
+        temp_token: tempToken,
+        temp_token_expiry: new Date(Date.now() + 20000).toISOString()
+      }).eq('session_id', sessionId)
+    } catch (e) {}
 
     const res = NextResponse.redirect(new URL(`/next?token=${tempToken}`, request.url))
     res.cookies.set('k_checkpoint', '2', { httpOnly: false, maxAge: 1800, path: '/' })

@@ -16,11 +16,7 @@ export async function POST(request) {
       user_agent: request.headers.get('user-agent') || 'unknown'
     })
 
-  if (error) {
-    return NextResponse.json({ error: 'session creation failed' }, { status: 500 })
-  }
-
-  const response = NextResponse.json({ checkpoint: 1 })
+  const response = NextResponse.json({ sid: sessionId })
 
   response.cookies.set('k_session', sessionId, {
     httpOnly: true,

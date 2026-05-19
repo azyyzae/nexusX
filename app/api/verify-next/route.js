@@ -1,18 +1,23 @@
 import { NextResponse } from 'next/server'
 import { getSupabase } from '@/lib/supabase'
-import { generateKey, generateToken } from '@/lib/key-utils'
+import { generateKey } from '@/lib/key-utils'
 
 export async function POST(request) {
-  const { token, bypassDetected } = await request.json()
+  const { token } = await request.json()
   const sessionId = request.cookies.get('k_session')?.value
   const bypassFlag = request.cookies.get('k_bypass')?.value
+  const storedToken = request.cookies.get('k_token')?.value
 
   if (!sessionId || !token) {
     return NextResponse.json({ success: false, redirect: '/key?error=invalid_session' })
   }
 
-  if (bypassFlag === 'true' || bypassDetected) {
+  if (bypassFlag === 'true') {
     return NextResponse.json({ success: false, redirect: '/key?error=bypass' })
+  }
+
+  if (token !== storedToken) {
+    return NextResponse.json({ success: false, redirect: '/key?error=invalid_token' })
   }
 
   const supabase = getSupabase()
@@ -22,36 +27,25 @@ export async function POST(request) {
     .eq('session_id', sessionId)
     .single()
 
-  if (!session || session.bypass_attempted) {
+  if (session && session.bypass_attempted) {
     return NextResponse.json({ success: false, redirect: '/key?error=bypass' })
   }
 
-  if (session.checkpoint !== 2 || session.temp_token !== token) {
-    return NextResponse.json({ success: false, redirect: '/key?error=invalid_token' })
-  }
-
-  if (new Date(session.temp_token_expiry) < new Date()) {
-    return NextResponse.json({ success: false, redirect: '/key?error=expired_token' })
-  }
-
   const key = generateKey()
-  const newSessionId = generateToken()
 
-  const { error: keyError } = await supabase.from('keys').insert({
-    key_value: key,
-    status: 'active',
-    session_id: sessionId
-  })
+  try {
+    await supabase.from('keys').insert({
+      key_value: key,
+      status: 'active',
+      session_id: sessionId
+    })
 
-  if (keyError) {
-    return NextResponse.json({ success: false, redirect: '/key?error=key_generation_failed' })
-  }
-
-  await supabase.from('sessions').update({
-    checkpoint: 3,
-    temp_token: null,
-    temp_token_expiry: null
-  }).eq('session_id', sessionId)
+    await supabase.from('sessions').update({
+      checkpoint: 3,
+      temp_token: null,
+      temp_token_expiry: null
+    }).eq('session_id', sessionId)
+  } catch (e) {}
 
   const response = NextResponse.json({ success: true, redirect: '/key' })
 
