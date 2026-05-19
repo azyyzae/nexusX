@@ -48,7 +48,9 @@ export default function KeyPage() {
     const errorParam = params.get('error')
 
     if (getCookie('k_bypass') === 'true' || errorParam === 'bypass') {
-      setError('bypass')
+      const msg = params.get('msg')
+      window.history.replaceState({}, '', '/key')
+      setError(msg || 'bypass')
       return
     }
 

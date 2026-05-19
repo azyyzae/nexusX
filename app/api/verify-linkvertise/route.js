@@ -29,15 +29,15 @@ export async function GET(request) {
     clearTimeout(timeout)
     const result = await apiRes.text()
 
-    if (result !== 'TRUE') {
-      const supabase = getSupabase()
-      if (supabase) {
-        await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
+      if (result !== 'TRUE') {
+        const supabase = getSupabase()
+        if (supabase) {
+          await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
+        }
+        const res = NextResponse.json({ success: false, redirect: '/key?error=bypass&msg=' + encodeURIComponent(result) })
+        res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
+        return res
       }
-      const res = NextResponse.json({ success: false, redirect: '/key?error=bypass' })
-      res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
-      return res
-    }
   } catch (e) {
     return NextResponse.json({ success: false, redirect: '/key?error=api_error&msg=' + encodeURIComponent(e.message) })
   }
