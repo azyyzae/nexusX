@@ -11,6 +11,10 @@ export async function GET(request) {
   }
 
   const supabase = getSupabase()
+  if (!supabase) {
+    return NextResponse.json({ status: getStatusWord('not_found') })
+  }
+
   const { data } = await supabase
     .from('keys')
     .select('status')

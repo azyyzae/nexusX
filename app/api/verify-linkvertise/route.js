@@ -35,7 +35,9 @@ export async function GET(request) {
 
     if (result !== 'TRUE') {
       const supabase = getSupabase()
-      await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
+      if (supabase) {
+        await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
+      }
       const res = NextResponse.json({ success: false, redirect: '/key?error=bypass' })
       res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
       return res
@@ -43,14 +45,16 @@ export async function GET(request) {
 
     const tempToken = generateToken()
 
-    try {
-      const supabase = getSupabase()
-      await supabase.from('sessions').update({
-        checkpoint: 2,
-        temp_token: tempToken,
-        temp_token_expiry: new Date(Date.now() + 20000).toISOString()
-      }).eq('session_id', sessionId)
-    } catch (e) {}
+    const supabase = getSupabase()
+    if (supabase) {
+      try {
+        await supabase.from('sessions').update({
+          checkpoint: 2,
+          temp_token: tempToken,
+          temp_token_expiry: new Date(Date.now() + 20000).toISOString()
+        }).eq('session_id', sessionId)
+      } catch (e) {}
+    }
 
     const res = NextResponse.json({ success: true, token: tempToken })
     res.cookies.set('k_checkpoint', '2', { httpOnly: false, maxAge: 1800, path: '/' })

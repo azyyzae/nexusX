@@ -6,15 +6,17 @@ export async function POST(request) {
   const supabase = getSupabase()
   const sessionId = generateToken()
 
-  const { error } = await supabase
-    .from('sessions')
-    .insert({
-      session_id: sessionId,
-      checkpoint: 1,
-      start_time: new Date().toISOString(),
-      ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
-      user_agent: request.headers.get('user-agent') || 'unknown'
-    })
+  if (supabase) {
+    try {
+      await supabase.from('sessions').insert({
+        session_id: sessionId,
+        checkpoint: 1,
+        start_time: new Date().toISOString(),
+        ip_address: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        user_agent: request.headers.get('user-agent') || 'unknown'
+      })
+    } catch (e) {}
+  }
 
   const response = NextResponse.json({ sid: sessionId })
 

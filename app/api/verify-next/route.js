@@ -15,32 +15,24 @@ export async function POST(request) {
     return NextResponse.json({ success: false, redirect: '/key?error=bypass' })
   }
 
-  const supabase = getSupabase()
-  const { data: session } = await supabase
-    .from('sessions')
-    .select('*')
-    .eq('session_id', sessionId)
-    .single()
-
-  if (session && session.bypass_attempted) {
-    return NextResponse.json({ success: false, redirect: '/key?error=bypass' })
-  }
-
   const key = generateKey()
 
-  try {
-    await supabase.from('keys').insert({
-      key_value: key,
-      status: 'active',
-      session_id: sessionId
-    })
+  const supabase = getSupabase()
+  if (supabase) {
+    try {
+      await supabase.from('keys').insert({
+        key_value: key,
+        status: 'active',
+        session_id: sessionId
+      })
 
-    await supabase.from('sessions').update({
-      checkpoint: 3,
-      temp_token: null,
-      temp_token_expiry: null
-    }).eq('session_id', sessionId)
-  } catch (e) {}
+      await supabase.from('sessions').update({
+        checkpoint: 3,
+        temp_token: null,
+        temp_token_expiry: null
+      }).eq('session_id', sessionId)
+    } catch (e) {}
+  }
 
   const response = NextResponse.json({ success: true, redirect: '/key' })
 
