@@ -42,6 +42,7 @@ export default function KeyPage() {
         return
       }
       if (data.needSecond) {
+        setSecondRound(true)
         setStep(1)
         return
       }
