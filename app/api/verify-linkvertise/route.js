@@ -27,17 +27,17 @@ export async function GET(request) {
       signal: controller.signal
     })
     clearTimeout(timeout)
-    const result = await apiRes.text()
+    const result = await apiRes.json()
 
-      if (result !== 'TRUE') {
-        const supabase = getSupabase()
-        if (supabase) {
-          await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
-        }
-        const res = NextResponse.json({ success: false, redirect: '/key?error=bypass&msg=' + encodeURIComponent(result) })
-        res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
-        return res
+    if (!result || result.status !== true) {
+      const supabase = getSupabase()
+      if (supabase) {
+        await supabase.from('sessions').update({ bypass_attempted: true }).eq('session_id', sessionId)
       }
+      const res = NextResponse.json({ success: false, redirect: '/key?error=bypass&msg=' + encodeURIComponent(JSON.stringify(result)) })
+      res.cookies.set('k_bypass', 'true', { httpOnly: false, maxAge: 1800, path: '/' })
+      return res
+    }
   } catch (e) {
     return NextResponse.json({ success: false, redirect: '/key?error=api_error&msg=' + encodeURIComponent(e.message) })
   }
